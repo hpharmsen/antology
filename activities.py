@@ -8,20 +8,20 @@ def explore(ant):
         ant.angle = 90
     elif ant.center_y >= 600:
         ant.angle = 180
-    elif ant.center_y < 0:
+    elif ant.center_y < 8:
         ant.angle = 0
     else:
         ant.angle += random.choice([-90, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 90])
         ant.angle %= 360
 
     if ant.angle == 0:
-        ant.center_y += ant.speed
+        ant.center_y += ant.speed * ant.scale
     elif ant.angle == 90:
-        ant.center_x += ant.speed
+        ant.center_x += ant.speed * ant.scale
     elif ant.angle == 180:
-        ant.center_y -= ant.speed
+        ant.center_y -= ant.speed * ant.scale
     elif ant.angle == 270:
-        ant.center_x -= ant.speed
+        ant.center_x -= ant.speed * ant.scale
     else:
         pass
     ant.path.add((ant.center_x, ant.center_y))

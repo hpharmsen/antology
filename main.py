@@ -2,14 +2,22 @@ import random
 import arcade
 from ant import Ant
 
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+SCALE = 2
+SCREEN_WIDTH = 580 * SCALE
+SCREEN_HEIGHT = 420 * SCALE
 SCREEN_TITLE = "Simple Ant"
 
-WALL_MIN = 10
-WALL_MAX = 160
-WALL_THICKNESS = 6
-WALL_COLOR = '#555'
+NUM_WALLS = 60
+WALL_MIN = 10 * SCALE
+WALL_MAX = 50 * SCALE
+WALL_THICKNESS = 6 * SCALE
+WALL_COLOR = '#777'
+BASE_COLOR = '#222'
+FOOD_COLOR = arcade.color.APPLE_GREEN
+NUM_FOOD_BLOBS = 30
+FIELD_COLOR = arcade.color.DARK_VANILLA
+NUM_ANTS = 30
+FOOD_BLOB_SIZE = 8
 
 
 class Arena(arcade.Window):
@@ -18,32 +26,39 @@ class Arena(arcade.Window):
     def __init__(self, width, height, title):
         super().__init__(width, height, title)
 
-        self.wall_list = None
-        self.ant_list = None
+        self.wall_list = arcade.SpriteList()
+        self.food_list = arcade.SpriteList()
+        self.ant_list = arcade.SpriteList()
         self.physics_engine = None
 
     def setup(self):
-        self.ant_list = []
-        self.wall_list = arcade.SpriteList()
 
-        # Set up the player
-        #self.player_sprite = arcade.Sprite("ant1.png")
-        #self.player_sprite.center_x = SCREEN_WIDTH/2
-        #self.player_sprite.center_y = SCREEN_HEIGHT/2
-        #self.player_list.append(self.player_sprite)
-
+        self.create_base()
         # # -- Set up the walls
         # # Create a row of boxes
-        for _ in range( 50 ):
+        for _ in range( NUM_WALLS ):
             self.create_wall()
 
-        for _ in range( 1 ):
-            x = 0 #random.randrange(SCREEN_WIDTH)
-            y = 0 # random.randrange(SCREEN_HEIGHT)
-            ant = Ant(x,y, self)
+        for _ in range( NUM_FOOD_BLOBS):
+            self.create_food_blob(FOOD_BLOB_SIZE)
+
+        for _ in range( NUM_ANTS ):
+            ant = Ant(SCREEN_WIDTH/2,0, self, scale=SCALE)
             self.ant_list.append(ant)
 
-        arcade.set_background_color(arcade.color.AMAZON)
+        arcade.set_background_color(FIELD_COLOR)
+
+    def create_base(self):
+        x = SCREEN_WIDTH / 2
+        for y in range( 0, round(20*SCALE), WALL_THICKNESS):
+            block = arcade.SpriteSolidColor(WALL_THICKNESS, WALL_THICKNESS, BASE_COLOR)
+            block.center_x = x-8*SCALE
+            block.center_y = y
+            self.wall_list.append(block)
+            block = arcade.SpriteSolidColor(WALL_THICKNESS, WALL_THICKNESS, BASE_COLOR)
+            block.center_x = x+8*SCALE
+            block.center_y = y
+            self.wall_list.append(block)
 
     def create_wall(self):
         def block_at( x, y ):
@@ -75,12 +90,25 @@ class Arena(arcade.Window):
                     self.wall_list.append( block )
                 return
 
+    def create_food_blob(self, size=10):
+        start_x = random.randint( 0, SCREEN_WIDTH-size*SCALE)
+        start_y = random.randint( 0, SCREEN_HEIGHT-size*SCALE)
+        for x in range( start_x, start_x+size*SCALE, SCALE):
+            for y in range(start_y, start_y + size*SCALE, SCALE):
+                block = arcade.SpriteSolidColor(SCALE, SCALE, FOOD_COLOR )
+                block.center_x = x
+                block.center_y = y
+                if not arcade.check_for_collision_with_list(block, self.wall_list):
+                    self.food_list.append( block )
+
+
     def on_draw(self):
         # This command has to happen before we start drawing
         arcade.start_render()
 
         # Draw all the sprites.
         self.wall_list.draw()
+        self.food_list.draw()
         for ant in self.ant_list:
             ant.draw()
 

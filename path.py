@@ -34,6 +34,9 @@ class Path():
     def backtrack(self):
         to_delete = self.last_coo
         self.last_coo = self.path[to_delete]
+
+        if len( self.path.keys()) == 1:
+            pass
         del self.path[to_delete]
         return self.last_coo
 
