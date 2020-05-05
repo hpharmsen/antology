@@ -1,106 +1,124 @@
 import random
 import arcade
 from ant import Ant
+from colony import Colony
 
-SCALE = 2
-SCREEN_WIDTH = 580 * SCALE
-SCREEN_HEIGHT = 420 * SCALE
-SCREEN_TITLE = "Simple Ant"
-
-NUM_WALLS = 60
-WALL_MIN = 10 * SCALE
-WALL_MAX = 50 * SCALE
-WALL_THICKNESS = 6 * SCALE
-WALL_COLOR = '#777'
-BASE_COLOR = '#222'
-FOOD_COLOR = arcade.color.APPLE_GREEN
-NUM_FOOD_BLOBS = 30
-FIELD_COLOR = arcade.color.DARK_VANILLA
-NUM_ANTS = 30
-FOOD_BLOB_SIZE = 8
+# TODO
+# - Food blobs 2x zo groot
+# - Food blobs droppen met muis
+# - Food blob coo is altijd centrale coo
+# - Lijn tekenen bij backtrack
+from settings import settings
 
 
 class Arena(arcade.Window):
-    """ Main application class. """
-
-    def __init__(self, width, height, title):
+    def __init__(self, width, height, title, generation_callback=None):
         super().__init__(width, height, title)
 
-        self.wall_list = arcade.SpriteList()
-        self.food_list = arcade.SpriteList()
-        self.ant_list = arcade.SpriteList()
+        self.wall_list = arcade.SpriteList(is_static=True, use_spatial_hash=True)
+        self.food_list = arcade.SpriteList(is_static=True, use_spatial_hash=True)
+        self.ant_list = arcade.SpriteList(use_spatial_hash=False)
         self.physics_engine = None
+        if settings.MAX_FPS:
+            self.set_update_rate(1 / settings.MAX_FPS)
+        self.actual_fps = settings.MAX_FPS  # Initializse to something
+
+        self.generation = 0
+        self.generation_callback = generation_callback  # For testing purposes
 
     def setup(self):
 
-        self.create_base()
-        # # -- Set up the walls
-        # # Create a row of boxes
-        for _ in range( NUM_WALLS ):
+        if settings.DRAW_BASE:
+            self.create_base()
+
+        for _ in range(settings.NUM_WALLS):
             self.create_wall()
 
-        for _ in range( NUM_FOOD_BLOBS):
-            self.create_food_blob(FOOD_BLOB_SIZE)
+        for _ in range(settings.NUM_FOOD_BLOBS):
+            self.create_food_blob(settings.FOOD_BLOB_SIZE)
 
-        for _ in range( NUM_ANTS ):
-            ant = Ant(SCREEN_WIDTH/2,0, self, scale=SCALE)
+        self.colony = Colony()
+
+        for _ in range(settings.NUM_ANTS):
+            ant = Ant(
+                settings.SCREEN_WIDTH / 2, 0, self, self.colony, scale=settings.SCALE
+            )
             self.ant_list.append(ant)
 
-        arcade.set_background_color(FIELD_COLOR)
+        arcade.set_background_color(settings.FIELD_COLOR)
+
+        if self.generation_callback:
+            self.generation_callback(self.generation, self)
 
     def create_base(self):
-        x = SCREEN_WIDTH / 2
-        for y in range( 0, round(20*SCALE), WALL_THICKNESS):
-            block = arcade.SpriteSolidColor(WALL_THICKNESS, WALL_THICKNESS, BASE_COLOR)
-            block.center_x = x-8*SCALE
+        x = settings.SCREEN_WIDTH / 2
+        for y in range(0, round(20 * settings.SCALE), settings.WALL_THICKNESS()):
+            block = arcade.SpriteSolidColor(
+                settings.WALL_THICKNESS(),
+                settings.WALL_THICKNESS(),
+                settings.BASE_COLOR,
+            )
+            block.center_x = x - 8 * settings.SCALE
             block.center_y = y
             self.wall_list.append(block)
-            block = arcade.SpriteSolidColor(WALL_THICKNESS, WALL_THICKNESS, BASE_COLOR)
-            block.center_x = x+8*SCALE
+            block = arcade.SpriteSolidColor(
+                settings.WALL_THICKNESS(),
+                settings.WALL_THICKNESS(),
+                settings.BASE_COLOR,
+            )
+            block.center_x = x + 8 * settings.SCALE
             block.center_y = y
             self.wall_list.append(block)
 
     def create_wall(self):
-        def block_at( x, y ):
-            block = arcade.SpriteSolidColor(WALL_THICKNESS, WALL_THICKNESS, WALL_COLOR )
+        def block_at(x, y):
+            block = arcade.SpriteSolidColor(
+                settings.WALL_THICKNESS(),
+                settings.WALL_THICKNESS(),
+                settings.WALL_COLOR,
+            )
             block.center_x = x
             block.center_y = y
             wally.append(block)
 
         while True:
             wally = []
-            length = random.randint( WALL_MIN, WALL_MAX )
-            if random.random() < .5:
+            length = random.randint(settings.WALL_MIN(), settings.WALL_MAX())
+            if random.random() < 0.5:
                 # Horizontal
-                start_x = random.randint( 0, SCREEN_WIDTH-length )
-                y = random.randint( 0, SCREEN_HEIGHT )
-                for x in range( start_x, start_x+length, WALL_THICKNESS):
-                    block_at( x, y)
+                start_x = random.randint(0, settings.SCREEN_WIDTH - length)
+                y = random.randint(0, settings.SCREEN_HEIGHT)
+                for x in range(start_x, start_x + length, settings.WALL_THICKNESS()):
+                    block_at(x, y)
             else:
                 # Vertical
-                start_y = random.randint( 0, SCREEN_HEIGHT-length )
-                x = random.randint( 0, SCREEN_WIDTH )
-                for y in range( start_y, start_y+length, WALL_THICKNESS):
-                    block_at( x, y)
+                start_y = random.randint(0, settings.SCREEN_HEIGHT - length)
+                x = random.randint(0, settings.SCREEN_WIDTH)
+                for y in range(start_y, start_y + length, settings.WALL_THICKNESS()):
+                    block_at(x, y)
             for block in wally:
                 if arcade.check_for_collision_with_list(block, self.wall_list):
-                    break # Oops, break it off, try a new wall
+                    break  # Oops, break it off, try a new wall
             else:
                 for block in wally:
-                    self.wall_list.append( block )
+                    self.wall_list.append(block)
                 return
 
-    def create_food_blob(self, size=10):
-        start_x = random.randint( 0, SCREEN_WIDTH-size*SCALE)
-        start_y = random.randint( 0, SCREEN_HEIGHT-size*SCALE)
-        for x in range( start_x, start_x+size*SCALE, SCALE):
-            for y in range(start_y, start_y + size*SCALE, SCALE):
-                block = arcade.SpriteSolidColor(SCALE, SCALE, FOOD_COLOR )
+    def create_food_blob(self, size=10, start_coo=None):
+        scale = settings.SCALE * 3
+        if start_coo:
+            start_x, start_y = start_coo
+        else:
+            start_x = random.randint(0, settings.SCREEN_WIDTH - size * scale)
+            start_y = random.randint(0, settings.SCREEN_HEIGHT - size * scale)
+
+        for x in range(start_x, start_x + size * scale, scale):
+            for y in range(start_y, start_y + size * scale, scale):
+                block = arcade.SpriteSolidColor(scale, scale, settings.FOOD_COLOR)
                 block.center_x = x
                 block.center_y = y
                 if not arcade.check_for_collision_with_list(block, self.wall_list):
-                    self.food_list.append( block )
-
+                    self.food_list.append(block)
 
     def on_draw(self):
         # This command has to happen before we start drawing
@@ -111,6 +129,7 @@ class Arena(arcade.Window):
         self.food_list.draw()
         for ant in self.ant_list:
             ant.draw()
+            # ant.draw_hit_box((255,0,0))
 
     # def on_key_press(self, key, modifiers):
     #     """Called whenever a key is pressed. """
@@ -133,22 +152,21 @@ class Arena(arcade.Window):
     #         self.player_sprite.change_x = 0
 
     def on_update(self, delta_time):
-        """ Movement and game logic """
-
+        self.colony.tick()
+        self.actual_fps = (99 * self.actual_fps + 1 / delta_time) / 100
+        food_per_100_turns = self.colony.food_per_turn() * 100
+        self.set_caption(
+            f"{settings.SCREEN_TITLE} - {self.actual_fps:0.0f} fps, {food_per_100_turns:0.0f} food per 100 turns - {self.generation}"
+        )
         arcade.start_render()
         for ant in self.ant_list:
             ant.move()
-        #self.physics_engine.update()
-
-        # Generate a list of all sprites that collided with the player.
-        #coins_hit_list = arcade.check_for_collision_with_list(self.player_sprite, self.coin_list)
-
-def main():
-    """ Main method """
-    window = Arena(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
-    window.setup()
-    arcade.run()
+        self.generation += 1  #!! Dubbel naast colony.tick()
+        if self.generation_callback:
+            self.generation_callback(self.generation, self)
 
 
 if __name__ == "__main__":
-    main()
+    window = Arena(settings.SCREEN_WIDTH, settings.SCREEN_HEIGHT, settings.SCREEN_TITLE)
+    window.setup()
+    arcade.run()
